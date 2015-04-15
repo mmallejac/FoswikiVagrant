@@ -12,6 +12,12 @@ Hostname    with defaults of 8080 and 2220 (that is the directory name is the ho
  
 For example, I have Foswiki-09__8089_2229. It's an important help when creating multiple VMs as I am doing. In addition it means that each terminal reports the Hostname so I do not get lost.
 
+So to summarize :
+   * git clone https://github.com/Jlevens/FoswikiVagrantNginx
+   * mv FoswikiVagrantNginx testfw__8081_2221
+   * cd testfw__8081_2221
+   * vagrant up
+
 Version 0.1
 ===========
 
