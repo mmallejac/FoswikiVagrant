@@ -18,6 +18,8 @@ So to summarize :
    * cd testfw__8081_2221
    * vagrant up
 
+Note that Vagrant will also open is own ssh port in addition to your. It will be 2222 by default.
+
 Version 0.1
 ===========
 
