@@ -20,6 +20,9 @@ So to summarize :
 
 Note that Vagrant will also open is own ssh port in addition to your. It will be 2222 by default.
 
+In addition to the default configuration, the following is provided :
+   * a regular test user : log in as TestUser password TestUser
+
 Version 0.1
 ===========
 
