@@ -1,8 +1,9 @@
+
 # Fixed settings
 box = 'ubuntu/trusty64'
 ram = '1024'
 
-# Split the folder name to get other settings
+# Split the folder name to get the other settings
 vmName = File.basename(File.expand_path(File.dirname(__FILE__)))
 if match = vmName.match(/(.*?)__(.*?)_(.*)_(.*)/)
     hostName, www_port, ssh_port, web_serv = match.captures
@@ -13,8 +14,8 @@ else
     web_serv = "nginx"
 end
 
-# Provision our virtual machine
-# finally call our config shell script
+# Provision virtual machine
+# finally call config shell script
 VAGRANTFILE_API_VERSION = "2"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 

@@ -1,8 +1,12 @@
+#!/bin/bash
 
-# Our vagrantfile will provision a CPAN Config file for unattended install
-# Run cpan before apt-get, otherwise this Config file is not picked up
+# arguments, from Vagrantfile
+www_port=$1
+web_serv=$2
+echo "www_port : $www_port"
+echo "web_serv : $web_serv"
 
-# Started getting 404 accessing http://security.ubuntu.com, error came back with this suggestion
+# update all packages
 apt-get update
 
 # curl -L https://cpanmin.us | perl - --sudo App::cpanminus
@@ -25,11 +29,9 @@ cpanm --sudo --skip-installed \
 #  Crypt::Eksblowfish::Bcrypt                Only for bcrypt support on passwords
 #  Win32::Console                            Only for Windows
 
-apt-get install -y rcs # Required for legacy RCS stores moving to PFS now as default
+# Required for legacy RCS stores moving to PFS now as default
 
-apt-get install -y libdigest-sha-perl
-apt-get install -y libhtml-entities-numbered-perl
-apt-get install -y perltidy
+apt-get install -y rcs libdigest-sha-perl libhtml-entities-numbered-perl perltidy
 
 # As scanned from DEPENDENCIES files of distro
 
@@ -58,44 +60,12 @@ apt-get install -y perltidy
 # apt-get install -y libuniversal-perl
 
 # Extra perl libraries required
-apt-get install -y libalgorithm-diff-perl
-apt-get install -y libapache-htpasswd-perl
-apt-get install -y libarchive-tar-perl
-apt-get install -y libarchive-zip-perl
-apt-get install -y libauthen-sasl-perl
-apt-get install -y libcgi-session-perl
-apt-get install -y libcrypt-passwdmd5-perl
-apt-get install -y libcss-minifier-perl
-apt-get install -y libdevel-symdump-perl
-apt-get install -y libdigest-md5-perl
-apt-get install -y libdigest-sha-perl
-apt-get install -y libencode-perl
-apt-get install -y liberror-perl
-apt-get install -y libfcgi-perl
-apt-get install -y libfile-copy-recursive-perl
-apt-get install -y libfile-path-perl
-apt-get install -y libfile-remove-perl
-apt-get install -y libfile-spec-perl
-apt-get install -y libfile-temp-perl
-apt-get install -y libhtml-parser-perl
-apt-get install -y libhtml-tidy-perl
-apt-get install -y libhtml-tree-perl
-apt-get install -y libimage-magick-perl
-apt-get install -y libio-socket-ip-perl
-apt-get install -y libio-socket-ssl-perl
-apt-get install -y libjavascript-minifier-perl
-apt-get install -y libjson-perl
-apt-get install -y liblocale-maketext-perl
-apt-get install -y liblocale-msgfmt-perl
-apt-get install -y libmime-base64-perl
-apt-get install -y libsocket-perl
-apt-get install -y liburi-perl
-apt-get install -y libversion-perl
+apt-get install -y libalgorithm-diff-perl libapache-htpasswd-perl libarchive-tar-perl libarchive-zip-perl libauthen-sasl-perl libcgi-session-perl libcrypt-passwdmd5-perl libcss-minifier-perl libdevel-symdump-perl libdigest-md5-perl libdigest-sha-perl libencode-perl liberror-perl libfcgi-perl libfile-copy-recursive-perl libfile-path-perl libfile-remove-perl libfile-spec-perl libfile-temp-perl libhtml-parser-perl libhtml-tidy-perl libhtml-tree-perl libimage-magick-perl libio-socket-ip-perl libio-socket-ssl-perl libjavascript-minifier-perl libjson-perl liblocale-maketext-perl liblocale-msgfmt-perl libmime-base64-perl libsocket-perl liburi-perl libversion-perl
 
 # Needed by git hooks
-apt-get install -y libtext-diff-perl
+apt-get install -y git libtext-diff-perl
 
-apt-get install -y git
+# for nginx
 apt-get install -y nginx
 
 # give www-data a shell that way we can 'sudo -i -u www-data' later
@@ -269,8 +239,7 @@ EOF
 chown root:root /etc/init.d/fw-prod
 chmod 750 /etc/init.d/fw-prod
 
-mkdir /var/www
-mkdir /var/www/fw-prod
+mkdir --parents /var/www/fw-prod
 
 # Give www-data passwordless sudo rights
 #-- sudoers.d/www-data-----------------------------------------------------------------------------------
