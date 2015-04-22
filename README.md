@@ -1,5 +1,19 @@
 # FoswikiVagrantNginx
 
+Version 0.3
+===========
+
+We now can choose the web server : Apache or NginX
+
+Vagrantfile :
+   * web_serv option, nginx is the default
+   * less comment for better readability
+   * box name is now exactly the folder name (no longer timestamped)
+
+fw-install.sh :
+   * 2 parms received : www port and web server choice
+   * one apt-get is faster than multiple ones
+
 Version 0.2
 ===========
 The process has been slimmed down with only two files required. They are created inside the shell script which also allows me to parameterize certain elements.
