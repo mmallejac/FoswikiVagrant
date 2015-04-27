@@ -3,7 +3,9 @@
 Version 0.3
 ===========
 
-We now can choose the web server : Apache or NginX
+Project renamed from FoswikiVagrantNginx to FoswikiVagrant. We can now choose the web server between apache and nginx.
+
+Folder name is now : Hostname__webport_sshport_webserv, with defaults of : webport: 8080 - sshport:  2220 - webserv: nginx
 
 Vagrantfile :
    * web_serv option, nginx is the default
