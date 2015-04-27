@@ -1,18 +1,14 @@
 #!/bin/bash
 
-# arguments, from Vagrantfile
+# Get arguments from Vagrantfile
 www_port=$1
 web_serv=$2
-echo "www_port : $www_port"
-echo "web_serv : $web_serv"
 
-# update all packages
+# Update all packages
 apt-get update
 
-# curl -L https://cpanmin.us | perl - --sudo App::cpanminus
+# get cpan package installer and some packages
 apt-get install -y cpanminus
-
-# cpanm --sudo --mirror file:///vCPAN \
 cpanm --sudo --skip-installed \
    HTML::Entities \
    HTML::Entities::Numbered \
@@ -65,57 +61,59 @@ apt-get install -y libalgorithm-diff-perl libapache-htpasswd-perl libarchive-tar
 # Needed by git hooks
 apt-get install -y git libtext-diff-perl
 
-# for nginx
-apt-get install -y nginx
+# Set up web server
+echo "web_serv : $web_serv"
+if [ "$web_serv" == "apache" ]
+then
+	apt-get install -y apache2
+else
+	apt-get install -y nginx
 
-# give www-data a shell that way we can 'sudo -i -u www-data' later
-chsh -s /bin/bash www-data
-
-#-- fw-prod.conf ----------------------------------------------------------------------------------------
-cat <<EOF > /etc/nginx/sites-available/fw-prod.conf
+	# start file fw-prod.conf 
+	cat <<EOF > /etc/nginx/sites-available/fw-prod.conf
 server {
     server_name  localhost:$1;
 EOF
-# Append the rest without shell $vars, so we do not need any escapes
-cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
+	# Append the rest without shell $vars, so we do not need any escapes
+	cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
 
     error_log /var/log/nginx/fw-prod.log debug;
     set $fw_root "/var/www/fw-prod/core";
     root $fw_root;
 
     location /pub/ {
-        try_files $uri =404;
-        limit_except GET POST { deny all; }
+	try_files $uri =404;
+	limit_except GET POST { deny all; }
     }
     location / {
-        deny all;
+	deny all;
     }
     location = / {
-           gzip off;
-           include fastcgi_params;
-           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-           fastcgi_split_path_info  (/.*+)(/.*+);
-           fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
-           fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
-           fastcgi_param            SCRIPT_NAME     view;
+	   gzip off;
+	   include fastcgi_params;
+	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+	   fastcgi_split_path_info  (/.*+)(/.*+);
+	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
+	   fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
+	   fastcgi_param            SCRIPT_NAME     view;
     }
     location ~ ^/[A-Z][A-Za-z0-9]*?/? {
-           gzip off;
-           include fastcgi_params;
-           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-           fastcgi_split_path_info  (/.*+)(/.*+);
-           fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
-           fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
-           fastcgi_param            SCRIPT_NAME     view;
+	   gzip off;
+	   include fastcgi_params;
+	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+	   fastcgi_split_path_info  (/.*+)(/.*+);
+	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
+	   fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
+	   fastcgi_param            SCRIPT_NAME     view;
     }
     location ~ ^/(?!pub\/)([a-z]++)(\/|\?|\;|\&|\#|$) {
-           gzip off;
-           include fastcgi_params;
-           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-           fastcgi_split_path_info  (/\w+)(.*);
-           fastcgi_param            SCRIPT_FILENAME $fw_root/bin$fastcgi_script_name;
-           fastcgi_param            PATH_INFO       $fastcgi_path_info;
-           fastcgi_param            SCRIPT_NAME     $fastcgi_script_name;
+	   gzip off;
+	   include fastcgi_params;
+	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+	   fastcgi_split_path_info  (/\w+)(.*);
+	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin$fastcgi_script_name;
+	   fastcgi_param            PATH_INFO       $fastcgi_path_info;
+	   fastcgi_param            SCRIPT_NAME     $fastcgi_script_name;
     }
 
     # if ($http_user_agent ~ ^SiteSucker|^iGetter|^larbin|^LeechGet|^RealDownload|^Teleport|^Webwhacker|^WebDevil|^Webzip|^Attache|^SiteSnagger|^WX_mail|^EmailCollecto$
@@ -123,18 +121,20 @@ cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
     # }
 }
 EOF
-#-- fw-prod.conf ----------------------------------------------------------------------------------------
+	# end file fw-prod.conf 
 
+fi
 
-#-- init.d/fw-prod --------------------------------------------------------------------------------------
+# give www-data a shell that way we can 'sudo -i -u www-data' later
+chsh -s /bin/bash www-data
+
+# start file /etc/init.d/fw-prod 
 cat <<"EOF" > /etc/init.d/fw-prod
 #!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          fw-prod
 # Required-Start:    $syslog $remote_fs $network
 # Required-Stop:     $syslog $remote_fs $network
-# Should-Start:      fam
-# Should-Stop:       fam
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Start the Foswiki backend server.
@@ -234,54 +234,47 @@ case "$1" in
     ;;
 esac
 EOF
-#-- init.d/fw-prod --------------------------------------------------------------------------------------
+# end file /etc/init.d/fw-prod 
 
 chown root:root /etc/init.d/fw-prod
-chmod 750 /etc/init.d/fw-prod
+chmod 755 /etc/init.d/fw-prod
 
 mkdir --parents /var/www/fw-prod
 
 # Give www-data passwordless sudo rights
-#-- sudoers.d/www-data-----------------------------------------------------------------------------------
 cat <<EOF > /etc/sudoers.d/www-data
 www-data ALL=(ALL:ALL) NOPASSWD: ALL
 EOF
-#-- sudoers.d/www-data-----------------------------------------------------------------------------------
 
 # Create usual .config files for www-data, plus set up some useful env variables
 # (www-data is already set with /var/www as it's home directory)
 
 cp -rvt /var/www `find /etc/skel -name '.*'`
-
-#-- /var/www/.bashrc-----------------------------------------------------------------------------------
 cat <<EOF >> /var/www/.bashrc
-
 # Create some useful fw_* ENVironment variables
 fw_http='/etc/nginx/sites-available/fw-prod.conf'
 fw_init='/etc/init.d/fw-prod'
 fw_httplog='/var/log/nginx/fw-prod.log'
 export fw_http fw_init fw_httplog
 EOF
-#-- /var/www/.bashrc-----------------------------------------------------------------------------------
 
-chown www-data:www-data /var/www/.*
-chown www-data:www-data /var/www
-chown www-data:www-data /etc/nginx/sites-available/fw-prod.conf
+chown -R www-data:www-data /var/www/
+# MM chown www-data:www-data /etc/nginx/sites-available/fw-prod.conf
 mkdir /var/log/www
 touch /var/log/www/fw-prod.log
-chown www-data:www-data /var/log/www
-chown www-data:www-data /var/log/www/fw-prod.log
+chown -R  www-data:www-data /var/log/www/
 
-service nginx stop
-rm /etc/nginx/sites-enabled/default
-ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
-service nginx start
+# MM service nginx stop
+# MM rm /etc/nginx/sites-enabled/default
+# MM ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
+# MM service nginx start
 
+# Get FW distro from repo
 cd /var/www
 git clone https://github.com/foswiki/distro.git fw-prod
-chown -R www-data:www-data fw-prod
 
-cd fw-prod/core
+chown -R www-data:www-data fw-prod
+cd /var/www/fw-prod/core
 sudo -u www-data perl -T pseudo-install.pl developer
 sudo -u www-data perl -T pseudo-install.pl FastCGIEngineContrib
 
@@ -306,8 +299,8 @@ sudo -u www-data perl tools/configure \
   -set {SafeEnvPath}='/bin:/usr/bin' \
   -save
 
-service fw-prod start
 update-rc.d fw-prod defaults
+service fw-prod start
 
 # Hopefully http://localhost:$1 will now bring up the foswiki Main/WebHome topic
 
