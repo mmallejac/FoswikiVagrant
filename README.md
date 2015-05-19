@@ -3,18 +3,16 @@
 Version 0.3
 ===========
 
-Project renamed from FoswikiVagrantNginx to FoswikiVagrant. We can now choose the web server between apache and nginx.
+Project renamed from FoswikiVagrantNginx to FoswikiVagrant. Is it now possible to choose the web server : Apache or Nginx.
 
-Folder name is now : Hostname__webport_sshport_webserv, with defaults of : webport: 8080 - sshport:  2220 - webserv: nginx
+Folder name is now : Hostname__webport_sshport_webserv, with following default values  : webport: 8080 - sshport:  2220 - webserv: nginx
 
-Vagrantfile :
-   * web_serv option, nginx is the default
-   * less comment for better readability
-   * box name is now exactly the folder name (no longer timestamped)
+For instance :
+   * git clone https://github.com/Jlevens/FoswikiVagrant
+   * mv FoswikiVagrantNginx testfw__8081_2221_nginx
+   * cd testfw__8081_2221_nginx
+   * vagrant up
 
-fw-install.sh :
-   * 2 parms received : www port and web server choice
-   * one apt-get is faster than multiple ones
 
 
 Version 0.2
