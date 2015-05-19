@@ -1,35 +1,15 @@
 #!/bin/bash
 
+# -----------------------------------------------------------------------------
 # Get arguments from Vagrantfile
+
 www_port=$1
 web_serv=$2
 
-# Update all packages
+# -----------------------------------------------------------------------------
+# Setup packages mostly with apt, but also from cpan
+
 apt-get update
-
-# get cpan package installer and some packages
-apt-get install -y cpanminus
-cpanm --sudo --skip-installed \
-   HTML::Entities \
-   HTML::Entities::Numbered \
-   HTML::TreeBuilder \
-   Lingua::EN::Sentence \
-   Mozilla::CA \
-   URI::Escape \
-   Crypt::Eksblowfish::Bcrypt \
-   Win32::Console
-
-# cpanm POSIX   N/A core perl
-
-# cpan modules not really required
-#  Crypt::Eksblowfish::Bcrypt                Only for bcrypt support on passwords
-#  Win32::Console                            Only for Windows
-
-# Required for legacy RCS stores moving to PFS now as default
-
-apt-get install -y rcs libdigest-sha-perl libhtml-entities-numbered-perl perltidy
-
-# As scanned from DEPENDENCIES files of distro
 
 # This block is generally core perl modules (some exceptions) so no need to install
 # apt-get install -y libb-deparse-perl
@@ -55,27 +35,34 @@ apt-get install -y rcs libdigest-sha-perl libhtml-entities-numbered-perl perltid
 # apt-get install -y libsymbol-perl
 # apt-get install -y libuniversal-perl
 
-# Extra perl libraries required
-apt-get install -y libalgorithm-diff-perl libapache-htpasswd-perl libarchive-tar-perl libarchive-zip-perl libauthen-sasl-perl libcgi-session-perl libcrypt-passwdmd5-perl libcss-minifier-perl libdevel-symdump-perl libdigest-md5-perl libdigest-sha-perl libencode-perl liberror-perl libfcgi-perl libfile-copy-recursive-perl libfile-path-perl libfile-remove-perl libfile-spec-perl libfile-temp-perl libhtml-parser-perl libhtml-tidy-perl libhtml-tree-perl libimage-magick-perl libio-socket-ip-perl libio-socket-ssl-perl libjavascript-minifier-perl libjson-perl liblocale-maketext-perl liblocale-msgfmt-perl libmime-base64-perl libsocket-perl liburi-perl libversion-perl
+# Perl libraries and other required tools
+apt-get install -y libalgorithm-diff-perl libapache-htpasswd-perl libarchive-tar-perl libarchive-zip-perl libauthen-sasl-perl libcgi-session-perl libcrypt-passwdmd5-perl libcss-minifier-perl libdevel-symdump-perl libdigest-md5-perl libdigest-sha-perl libencode-perl liberror-perl libfcgi-perl libfile-copy-recursive-perl libfile-path-perl libfile-remove-perl libfile-spec-perl libfile-temp-perl libhtml-parser-perl libhtml-tidy-perl libhtml-tree-perl libimage-magick-perl libio-socket-ip-perl libio-socket-ssl-perl libjavascript-minifier-perl libjson-perl liblocale-maketext-perl liblocale-msgfmt-perl libmime-base64-perl libsocket-perl liburi-perl libversion-perl rcs perltidy libhtml-entities-numbered-perl libhtml-treebuilder-xpath-perl git libtext-diff-perl
 
-# Needed by git hooks
-apt-get install -y git libtext-diff-perl
+# Cpan package installer and some packages, not available through Ubuntu packages
+apt-get install -y cpanminus
+cpanm --sudo --skip-installed \
+   Lingua::EN::Sentence \
+   Mozilla::CA
 
-# Set up web server
+# cpan modules not really required
+#  Crypt::Eksblowfish::Bcrypt                Only for bcrypt support on passwords
+#  Win32::Console                            Only for Windows
+
+# -----------------------------------------------------------------------------
+# Set up web server, Apache or Nginx
+
 echo "web_serv : $web_serv"
-if [ "$web_serv" == "apache" ]
+if [ "$web_serv" == "nginx" ]
 then
-	apt-get install -y apache2
-else
 	apt-get install -y nginx
+	service nginx stop
 
 	# start file fw-prod.conf 
-	cat <<EOF > /etc/nginx/sites-available/fw-prod.conf
-server {
-    server_name  localhost:$1;
-EOF
-	# Append the rest without shell $vars, so we do not need any escapes
 	cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
+server {
+
+    listen	80;
+    server_name	localhost;
 
     error_log /var/log/nginx/fw-prod.log debug;
     set $fw_root "/var/www/fw-prod/core";
@@ -123,121 +110,323 @@ EOF
 EOF
 	# end file fw-prod.conf 
 
-fi
+	# Enable site
+	rm /etc/nginx/sites-enabled/default
+	ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
+	service nginx start
 
-# give www-data a shell that way we can 'sudo -i -u www-data' later
-chsh -s /bin/bash www-data
+	# give www-data a shell that way we can 'sudo -i -u www-data' later
+	chsh -s /bin/bash www-data
 
-# start file /etc/init.d/fw-prod 
-cat <<"EOF" > /etc/init.d/fw-prod
-#!/bin/sh
-### BEGIN INIT INFO
-# Provides:          fw-prod
-# Required-Start:    $syslog $remote_fs $network
-# Required-Stop:     $syslog $remote_fs $network
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Start the Foswiki backend server.
-### END INIT INFO
+	# -----------------------------------------------------------------------------
+	# Setup FCGI
 
-DESC="Foswiki Production Connector"
-NAME=fw-prod
+	# start file /etc/init.d/fw-prod 
+	cat <<"EOF" > /etc/init.d/fw-prod
+	#!/bin/sh
+	### BEGIN INIT INFO
+	# Provides:          fw-prod
+	# Required-Start:    $syslog $remote_fs $network
+	# Required-Stop:     $syslog $remote_fs $network
+	# Default-Start:     2 3 4 5
+	# Default-Stop:      0 1 6
+	# Short-Description: Start the Foswiki backend server.
+	### END INIT INFO
 
-PATH=/sbin:/bin:/usr/sbin:/usr/bin
-USER=www-data
-GRPOUP=www-data
+	DESC="Foswiki Production Connector"
+	NAME=fw-prod
 
-FOSWIKI_ROOT=/var/www/fw-prod/core
+	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+	USER=www-data
+	GRPOUP=www-data
 
-mkdir -p /var/run/www
-chown www-data:www-data /var/run/www
+	FOSWIKI_ROOT=/var/www/fw-prod/core
 
-FOSWIKI_FCGI=foswiki.fcgi
-FOSWIKI_BIND=/var/run/www/$NAME.sock
-FOSWIKI_CHILDREN=1
-FOSWIKI_PIDFILE=/var/run/www/$NAME.pid
-FOSWIKI_TRACE=0
+	mkdir -p /var/run/www
+	chown www-data:www-data /var/run/www
 
-# Include defaults if available
-if [ -f /etc/default/$NAME ] ; then
-    . /etc/default/$NAME
-fi
+	FOSWIKI_FCGI=foswiki.fcgi
+	FOSWIKI_BIND=/var/run/www/$NAME.sock
+	FOSWIKI_CHILDREN=1
+	FOSWIKI_PIDFILE=/var/run/www/$NAME.pid
+	FOSWIKI_TRACE=0
 
-FOSWIKI_DAEMON=$FOSWIKI_ROOT/bin/$FOSWIKI_FCGI
-FOSWIKI_DAEMON_OPTS="-n $FOSWIKI_CHILDREN -l $FOSWIKI_BIND -p $FOSWIKI_PIDFILE -d"
+	# Include defaults if available
+	if [ -f /etc/default/$NAME ] ; then
+	    . /etc/default/$NAME
+	fi
 
-start() {
-        log_daemon_msg "Starting $DESC" $NAME
-        :> $FOSWIKI_PIDFILE
-        echo PIDi=$$
-        chown $USER:$GROUP $FOSWIKI_PIDFILE
-        chmod 777 $FOSWIKI_PIDFILE
-        if ! start-stop-daemon --start --oknodo --quiet \
-            --chuid $USER:$GROUP \
-            --chdir $FOSWIKI_ROOT/bin \
-            --pidfile $FOSWIKI_PIDFILE -m \
-            --exec $FOSWIKI_DAEMON -- $FOSWIKI_DAEMON_OPTS
-        then
-            log_end_msg 1
-        else
-            log_end_msg 0
-        fi
-}
+	FOSWIKI_DAEMON=$FOSWIKI_ROOT/bin/$FOSWIKI_FCGI
+	FOSWIKI_DAEMON_OPTS="-n $FOSWIKI_CHILDREN -l $FOSWIKI_BIND -p $FOSWIKI_PIDFILE -d"
 
-stop() {
-        log_daemon_msg "Stopping $DESC" $NAME
-        if start-stop-daemon --stop --retry 30 --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
-        then
-            rm -f $FOSWIKI_PIDFILE
-            log_end_msg 0
-        else
-            log_end_msg 1
-        fi
-}
+	start() {
+		log_daemon_msg "Starting $DESC" $NAME
+		:> $FOSWIKI_PIDFILE
+		echo PIDi=$$
+		chown $USER:$GROUP $FOSWIKI_PIDFILE
+		chmod 777 $FOSWIKI_PIDFILE
+		if ! start-stop-daemon --start --oknodo --quiet \
+		    --chuid $USER:$GROUP \
+		    --chdir $FOSWIKI_ROOT/bin \
+		    --pidfile $FOSWIKI_PIDFILE -m \
+		    --exec $FOSWIKI_DAEMON -- $FOSWIKI_DAEMON_OPTS
+		then
+		    log_end_msg 1
+		else
+		    log_end_msg 0
+		fi
+	}
 
-reload() {
-        log_daemon_msg "Reloading $DESC" $NAME
-        if start-stop-daemon --stop --signal HUP --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
-        then
-            log_end_msg 0
-        else
-            log_end_msg 1
-        fi
-}
+	stop() {
+		log_daemon_msg "Stopping $DESC" $NAME
+		if start-stop-daemon --stop --retry 30 --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
+		then
+		    rm -f $FOSWIKI_PIDFILE
+		    log_end_msg 0
+		else
+		    log_end_msg 1
+		fi
+	}
 
-status() {
-        status_of_proc -p "$FOSWIKI_PIDFILE" "$FOSWIKI_DAEMON" $NAME
-}
+	reload() {
+		log_daemon_msg "Reloading $DESC" $NAME
+		if start-stop-daemon --stop --signal HUP --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
+		then
+		    log_end_msg 0
+		else
+		    log_end_msg 1
+		fi
+	}
 
-. /lib/lsb/init-functions
+	status() {
+		status_of_proc -p "$FOSWIKI_PIDFILE" "$FOSWIKI_DAEMON" $NAME
+	}
 
-case "$1" in
-  start)
-    start
-    ;;
-  stop)
-    stop
-    ;;
-  reload)
-    reload
-    ;;
-  restart)
-    stop
-    start
-    ;;
-  status)
-    status
-    ;;
-  *)
-    echo "Usage: $NAME {start|stop|restart|reload|status}"
-    exit 1
-    ;;
-esac
+	. /lib/lsb/init-functions
+
+	case "$1" in
+	  start)
+	    start
+	    ;;
+	  stop)
+	    stop
+	    ;;
+	  reload)
+	    reload
+	    ;;
+	  restart)
+	    stop
+	    start
+	    ;;
+	  status)
+	    status
+	    ;;
+	  *)
+	    echo "Usage: $NAME {start|stop|restart|reload|status}"
+	    exit 1
+	    ;;
+	esac
 EOF
-# end file /etc/init.d/fw-prod 
+	# end file /etc/init.d/fw-prod 
 
-chown root:root /etc/init.d/fw-prod
-chmod 755 /etc/init.d/fw-prod
+	chown root:root /etc/init.d/fw-prod
+	chmod 755 /etc/init.d/fw-prod
+else
+	apt-get install -y apache2 libapache2-mod-fcgid
+	a2enmod rewrite cgid
+	service apache stop
+	rm /etc/apache2/sites-available/000-default.conf
+	rm /etc/apache2/sites-available/default-ssl.conf
+	# start file 000-default.conf
+	cat <<"EOF" > /etc/apache2/sites-available/fw-prod.conf
+# Autogenerated httpd.conf file for Foswiki.
+# Generated at http://foswiki.org/Support/ApacheConfigGenerator?vhost=;port=;dir=/var/www/fw-prod/core;symlink=on;pathurl=/;shorterurls=enabled;engine=FastCGI;fastcgimodule=fcgid;fcgidreqlen=;apver=2;confighost=;configip=;configuser=;loginmanager=Template;htpath=;errordocument=UserRegistration;errorcustom=;phpinstalled=None;blockpubhtml=;blocktrashpub=;controlattach=;blockspiders=;foswikiversion=1.2;apacheversion=2.4;timeout=;ssl=;sslcert=/etc/ssl/apache2/yourservercert.pem;sslchain=/etc/ssl/apache2/sub.class1.server.ca.pem;sslkey=/etc/ssl/apache2/yourservercertkey.pem
+
+# For Foswiki version 1.2,  Apache 2.4
+
+# The Alias defines a url that points to the root of the Foswiki installation.
+# The first parameter will be part of the URL to your installation e.g.
+# http://my.co.uk/foswiki/bin/view/...
+# The second parameter must point to the physical path on your disc.
+
+Alias /bin/configure "/var/www/fw-prod/core/bin/configure"
+Alias /bin "/var/www/fw-prod/core/bin/foswiki.fcgi"
+
+# The following Alias is used to access files in the pub directory (attachments etc)
+# It must come _after_ the ScriptAlias.
+# If short URLs are enabled, and any other local directories or files need to be accessed directly, they
+# must also be specified in an Alias statement, and must not conflict with a web name.
+
+Alias /pub "/var/www/fw-prod/core/pub"
+Alias /robots.txt "/var/www/fw-prod/core/robots.txt"
+
+#  Rewriting is required for Short URLs, and Attachment redirecting to viewfile
+RewriteEngine    on
+#RewriteLog "/var/log/apache/rewrite.log"
+#RewriteLogLevel 0
+
+# short urls
+Alias / "/var/www/fw-prod/core/bin/foswiki.fcgi/"
+RewriteRule ^/+bin/+view/+(.*) /$1 [L,NE,R]
+RewriteRule ^/+bin/+view$ / [L,NE,R]
+
+# This enables access to the documents in the Foswiki root directory
+
+<Directory "/var/www/fw-prod/core">
+    <RequireAll>
+        Require all granted
+        Require not env blockAccess
+    </RequireAll>
+</Directory>
+
+<IfModule mod_fcgid.c>
+    DefaultMaxClassProcessCount 3
+
+    # Refer to details at http://fastcgi.coremail.cn/doc.htm
+</IfModule>
+
+# This specifies the options on the Foswiki scripts directory. The ExecCGI
+# and SetHandler tell apache that it contains scripts. "Allow from all"
+# lets any IP address access this URL.
+# Note:  If you use SELinux, you also have to "Allow httpd cgi support" in your SELinux policies
+
+<Directory "/var/www/fw-prod/core/bin">
+    AllowOverride None
+
+    <RequireAll>
+        Require all granted
+        Require not env blockAccess
+    </RequireAll>
+
+    Options +ExecCGI  +FollowSymLinks
+    SetHandler cgi-script
+    <Files "foswiki.fcgi">
+        SetHandler fcgid-script
+    </Files>
+
+    # Password file for Foswiki users
+    AuthUserFile "/var/www/fw-prod/core/data/.htpasswd"
+    AuthName 'Enter your WikiName: (First name and last name, no space, no dots, capitalized, e.g. JohnSmith). Cancel to register if you do not have one.'
+    AuthType Basic
+
+    # File to return on access control error (e.g. wrong password)
+    ErrorDocument 401 /System/UserRegistration
+
+</Directory>
+
+# This sets the options on the pub directory, which contains attachments and
+# other files like CSS stylesheets and icons. AllowOverride None stops a
+# user installing a .htaccess file that overrides these options.
+# Note that files in pub are *not* protected by Foswiki Access Controls,
+# so if you want to control access to files attached to topics you need to
+# block access to the specific directories same way as the ApacheConfigGenerator
+# blocks access to the pub directory of the Trash web
+<Directory "/var/www/fw-prod/core/pub">
+    Options None
+    Options +FollowSymLinks
+    AllowOverride None
+
+    <RequireAll>
+        Require all granted
+        Require not env blockAccess
+    </RequireAll>
+    ErrorDocument 404 /bin/viewfile
+
+   # This line will redefine the mime type for the most common types of scripts
+    AddType text/plain .shtml .php .php3 .phtml .phtm .pl .py .cgi
+   #
+   # add an Expires header that is sufficiently in the future that the browser does not even ask if its uptodate
+   # reducing the load on the server significantly
+   # IF you can, you should enable this - it _will_ improve your Foswiki experience, even if you set it to under one day.
+   # you may need to enable expires_module in your main apache config
+   #LoadModule expires_module libexec/httpd/mod_expires.so
+   #AddModule mod_expires.c
+   #<ifmodule mod_expires.c>
+   #  <filesmatch "\.(jpe?g|gif|png|css(\.gz)?|js(\.gz)?|ico)$">
+   #       ExpiresActive on
+   #       ExpiresDefault "access plus 11 days"
+   #   </filesmatch>
+   #</ifmodule>
+   #
+   # Serve pre-compressed versions of .js and .css files, if they exist
+   # Some browsers do not handle this correctly, which is why it is disabled by default
+   # <FilesMatch "\.(js|css)$">
+   #         RewriteEngine on
+   #         RewriteCond %{HTTP:Accept-encoding} gzip
+   #         RewriteCond %{REQUEST_FILENAME}.gz -f
+   #         RewriteRule ^(.*)$ %{REQUEST_URI}.gz [L,QSA]
+   # </FilesMatch>
+   # <FilesMatch "\.(js|css)\?.*$">
+   #         RewriteEngine on
+   #         RewriteCond %{HTTP:Accept-encoding} gzip
+   #         RewriteCond %{REQUEST_FILENAME}.gz -f
+   #         RewriteRule ^([^?]*)\?(.*)$ $1.gz?$2 [L]
+   # </FilesMatch>
+   # <FilesMatch "\.js\.gz(\?.*)?$">
+   #         AddEncoding x-gzip .gz
+   #         AddType application/x-javascript .gz
+   # </FilesMatch>
+   # <FilesMatch "\.css\.gz(\?.*)?$">
+   #         AddEncoding x-gzip .gz
+   #         AddType text/css .gz
+   # </FilesMatch>
+
+</Directory>
+
+# Security note: All other directories should be set so
+# that they are *not* visible as URLs, so we set them as =deny from all=.
+<Directory "/var/www/fw-prod/core/data">
+    Require all denied
+</Directory>
+
+<Directory "/var/www/fw-prod/core/templates">
+    Require all denied
+</Directory>
+
+<Directory "/var/www/fw-prod/core/lib">
+    Require all denied
+</Directory>
+
+<Directory "/var/www/fw-prod/core/locale">
+    Require all denied
+</Directory>
+
+<Directory "/var/www/fw-prod/core/tools">
+    Require all denied
+</Directory>
+
+<Directory "/var/www/fw-prod/core/working">
+    Require all denied
+</Directory>
+
+# We set an environment variable called blockAccess.
+#
+# Setting a BrowserMatchNoCase to ^$ is important. It prevents Foswiki from
+# including its own topics as URLs and also prevents other Foswikis from
+# doing the same. This is important to prevent the most obvious
+# Denial of Service attacks.
+#
+# You can expand this by adding more BrowserMatchNoCase statements to
+# block evil browser agents trying to crawl your Foswiki
+#
+# Example:
+# BrowserMatchNoCase ^SiteSucker blockAccess
+# BrowserMatchNoCase ^$ blockAccess
+
+BrowserMatchNoCase ^$ blockAccess
+
+
+EOF
+	# end file fw-prod.conf
+
+	# Enable site and restart server
+	a2dissite 000-default.conf
+	a2ensite fw-prod
+	service apache2 restart
+fi
+
+# -----------------------------------------------------------------------------
+# Setup web site folders
 
 mkdir --parents /var/www/fw-prod
 
@@ -259,17 +448,13 @@ export fw_http fw_init fw_httplog
 EOF
 
 chown -R www-data:www-data /var/www/
-# MM chown www-data:www-data /etc/nginx/sites-available/fw-prod.conf
 mkdir /var/log/www
 touch /var/log/www/fw-prod.log
 chown -R  www-data:www-data /var/log/www/
 
-# MM service nginx stop
-# MM rm /etc/nginx/sites-enabled/default
-# MM ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
-# MM service nginx start
-
+# -----------------------------------------------------------------------------
 # Get FW distro from repo
+
 cd /var/www
 git clone https://github.com/foswiki/distro.git fw-prod
 
@@ -277,11 +462,14 @@ chown -R www-data:www-data fw-prod
 cd /var/www/fw-prod/core
 sudo -u www-data perl -T pseudo-install.pl developer
 sudo -u www-data perl -T pseudo-install.pl FastCGIEngineContrib
+# MM
+# sudo -u www-data perl -T pseudo-install.pl NatSkin NatSkinPlugin Solr ClassificationPlugin 
 
 # Bootstrap configure
+  # -set {DefaultUrlHost}="http://localhost:$www_port" \
 sudo -u www-data perl tools/configure \
   -noprompt \
-  -set {DefaultUrlHost}="http://localhost:$1" \
+  -set {DefaultUrlHost}="http://localhost" \
   -set {ScriptUrlPath}='' \
   -set {ScriptUrlPaths}{view}='' \
   -set {PubUrlPath}='/pub' \
@@ -299,8 +487,14 @@ sudo -u www-data perl tools/configure \
   -set {SafeEnvPath}='/bin:/usr/bin' \
   -save
 
-update-rc.d fw-prod defaults
-service fw-prod start
+# -----------------------------------------------------------------------------
+# enable and start fcgi
 
-# Hopefully http://localhost:$1 will now bring up the foswiki Main/WebHome topic
+update-rc.d fw-prod defaults
+
+if [ "$web_serv" == "nginx" ]
+then service fw-prod start
+fi
+
+# Hopefully http://localhost:$www_port will now bring up the foswiki Main/WebHome topic
 
