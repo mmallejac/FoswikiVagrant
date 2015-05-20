@@ -5,6 +5,7 @@
 
 www_port=$1
 web_serv=$2
+extraStf=$3
 
 # -----------------------------------------------------------------------------
 # Setup packages mostly with apt, but also from cpan
@@ -54,53 +55,54 @@ cpanm --sudo --skip-installed \
 echo "web_serv : $web_serv"
 if [ "$web_serv" == "nginx" ]
 then
-	apt-get install -y nginx
-	service nginx stop
+        # Nginx
+        apt-get install -y nginx
+        service nginx stop
 
-	# start file fw-prod.conf 
-	cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
+        # start file fw-prod.conf 
+        cat <<"EOF" >> /etc/nginx/sites-available/fw-prod.conf
 server {
 
-    listen	80;
-    server_name	localhost;
+    listen      80;
+    server_name localhost;
 
     error_log /var/log/nginx/fw-prod.log debug;
     set $fw_root "/var/www/fw-prod/core";
     root $fw_root;
 
     location /pub/ {
-	try_files $uri =404;
-	limit_except GET POST { deny all; }
+        try_files $uri =404;
+        limit_except GET POST { deny all; }
     }
     location / {
-	deny all;
+        deny all;
     }
     location = / {
-	   gzip off;
-	   include fastcgi_params;
-	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-	   fastcgi_split_path_info  (/.*+)(/.*+);
-	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
-	   fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
-	   fastcgi_param            SCRIPT_NAME     view;
+           gzip off;
+           include fastcgi_params;
+           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+           fastcgi_split_path_info  (/.*+)(/.*+);
+           fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
+           fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
+           fastcgi_param            SCRIPT_NAME     view;
     }
     location ~ ^/[A-Z][A-Za-z0-9]*?/? {
-	   gzip off;
-	   include fastcgi_params;
-	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-	   fastcgi_split_path_info  (/.*+)(/.*+);
-	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
-	   fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
-	   fastcgi_param            SCRIPT_NAME     view;
+           gzip off;
+           include fastcgi_params;
+           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+           fastcgi_split_path_info  (/.*+)(/.*+);
+           fastcgi_param            SCRIPT_FILENAME $fw_root/bin/view;
+           fastcgi_param            PATH_INFO       $fastcgi_script_name$fastcgi_path_info;
+           fastcgi_param            SCRIPT_NAME     view;
     }
     location ~ ^/(?!pub\/)([a-z]++)(\/|\?|\;|\&|\#|$) {
-	   gzip off;
-	   include fastcgi_params;
-	   fastcgi_pass             unix:/var/run/www/fw-prod.sock;
-	   fastcgi_split_path_info  (/\w+)(.*);
-	   fastcgi_param            SCRIPT_FILENAME $fw_root/bin$fastcgi_script_name;
-	   fastcgi_param            PATH_INFO       $fastcgi_path_info;
-	   fastcgi_param            SCRIPT_NAME     $fastcgi_script_name;
+           gzip off;
+           include fastcgi_params;
+           fastcgi_pass             unix:/var/run/www/fw-prod.sock;
+           fastcgi_split_path_info  (/\w+)(.*);
+           fastcgi_param            SCRIPT_FILENAME $fw_root/bin$fastcgi_script_name;
+           fastcgi_param            PATH_INFO       $fastcgi_path_info;
+           fastcgi_param            SCRIPT_NAME     $fastcgi_script_name;
     }
 
     # if ($http_user_agent ~ ^SiteSucker|^iGetter|^larbin|^LeechGet|^RealDownload|^Teleport|^Webwhacker|^WebDevil|^Webzip|^Attache|^SiteSnagger|^WX_mail|^EmailCollecto$
@@ -108,139 +110,142 @@ server {
     # }
 }
 EOF
-	# end file fw-prod.conf 
+        # end file fw-prod.conf 
 
-	# Enable site
-	rm /etc/nginx/sites-enabled/default
-	ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
-	service nginx start
+        # Enable site
+        rm /etc/nginx/sites-enabled/default
+        ln -s /etc/nginx/sites-available/fw-prod.conf /etc/nginx/sites-enabled/fw-prod.conf
+        service nginx start
 
-	# give www-data a shell that way we can 'sudo -i -u www-data' later
-	chsh -s /bin/bash www-data
+        # give www-data a shell that way we can 'sudo -i -u www-data' later
+        chsh -s /bin/bash www-data
 
-	# -----------------------------------------------------------------------------
-	# Setup FCGI
+        # -----------------------------------------------------------------------------
+        # Setup FCGI
 
-	# start file /etc/init.d/fw-prod 
-	cat <<"EOF" > /etc/init.d/fw-prod
-	#!/bin/sh
-	### BEGIN INIT INFO
-	# Provides:          fw-prod
-	# Required-Start:    $syslog $remote_fs $network
-	# Required-Stop:     $syslog $remote_fs $network
-	# Default-Start:     2 3 4 5
-	# Default-Stop:      0 1 6
-	# Short-Description: Start the Foswiki backend server.
-	### END INIT INFO
+        # start file /etc/init.d/fw-prod 
+        cat <<"EOF" > /etc/init.d/fw-prod
+        #!/bin/sh
+        ### BEGIN INIT INFO
+        # Provides:          fw-prod
+        # Required-Start:    $syslog $remote_fs $network
+        # Required-Stop:     $syslog $remote_fs $network
+        # Default-Start:     2 3 4 5
+        # Default-Stop:      0 1 6
+        # Short-Description: Start the Foswiki backend server.
+        ### END INIT INFO
 
-	DESC="Foswiki Production Connector"
-	NAME=fw-prod
+        PATH=/sbin:/bin:/usr/sbin:/usr/bin
+        USER=www-data
+        GRPOUP=www-data
 
-	PATH=/sbin:/bin:/usr/sbin:/usr/bin
-	USER=www-data
-	GRPOUP=www-data
+        FOSWIKI_ROOT=/var/www/fw-prod/core
 
-	FOSWIKI_ROOT=/var/www/fw-prod/core
+        mkdir -p /var/run/www
+        chown www-data:www-data /var/run/www
 
-	mkdir -p /var/run/www
-	chown www-data:www-data /var/run/www
+        FOSWIKI_FCGI=foswiki.fcgi
+        FOSWIKI_BIND=/var/run/www/$NAME.sock
+        FOSWIKI_CHILDREN=1
+        FOSWIKI_PIDFILE=/var/run/www/$NAME.pid
+        FOSWIKI_TRACE=0
 
-	FOSWIKI_FCGI=foswiki.fcgi
-	FOSWIKI_BIND=/var/run/www/$NAME.sock
-	FOSWIKI_CHILDREN=1
-	FOSWIKI_PIDFILE=/var/run/www/$NAME.pid
-	FOSWIKI_TRACE=0
+        # Include defaults if available
+        if [ -f /etc/default/$NAME ] ; then
+            . /etc/default/$NAME
+        fi
 
-	# Include defaults if available
-	if [ -f /etc/default/$NAME ] ; then
-	    . /etc/default/$NAME
-	fi
+        FOSWIKI_DAEMON=$FOSWIKI_ROOT/bin/$FOSWIKI_FCGI
+        FOSWIKI_DAEMON_OPTS="-n $FOSWIKI_CHILDREN -l $FOSWIKI_BIND -p $FOSWIKI_PIDFILE -d"
 
-	FOSWIKI_DAEMON=$FOSWIKI_ROOT/bin/$FOSWIKI_FCGI
-	FOSWIKI_DAEMON_OPTS="-n $FOSWIKI_CHILDREN -l $FOSWIKI_BIND -p $FOSWIKI_PIDFILE -d"
+        start() {
+                log_daemon_msg "Starting $DESC" $NAME
+                :> $FOSWIKI_PIDFILE
+                echo PIDi=$$
+                chown $USER:$GROUP $FOSWIKI_PIDFILE
+                chmod 777 $FOSWIKI_PIDFILE
+                if ! start-stop-daemon --start --oknodo --quiet \
+                    --chuid $USER:$GROUP \
+                    --chdir $FOSWIKI_ROOT/bin \
+                    --pidfile $FOSWIKI_PIDFILE -m \
+                    --exec $FOSWIKI_DAEMON -- $FOSWIKI_DAEMON_OPTS
+                then
+                    log_end_msg 1
+                else
+                    log_end_msg 0
+                fi
+        }
 
-	start() {
-		log_daemon_msg "Starting $DESC" $NAME
-		:> $FOSWIKI_PIDFILE
-		echo PIDi=$$
-		chown $USER:$GROUP $FOSWIKI_PIDFILE
-		chmod 777 $FOSWIKI_PIDFILE
-		if ! start-stop-daemon --start --oknodo --quiet \
-		    --chuid $USER:$GROUP \
-		    --chdir $FOSWIKI_ROOT/bin \
-		    --pidfile $FOSWIKI_PIDFILE -m \
-		    --exec $FOSWIKI_DAEMON -- $FOSWIKI_DAEMON_OPTS
-		then
-		    log_end_msg 1
-		else
-		    log_end_msg 0
-		fi
-	}
+        stop() {
+                log_daemon_msg "Stopping $DESC" $NAME
+                if start-stop-daemon --stop --retry 30 --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
+                then
+                    rm -f $FOSWIKI_PIDFILE
+                    log_end_msg 0
+                else
+                    log_end_msg 1
+                fi
+        }
+        reload() {
+                log_daemon_msg "Reloading $DESC" $NAME
+                if start-stop-daemon --stop --signal HUP --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
+                then
+                    log_end_msg 0
+                else
+                    log_end_msg 1
+                fi
+        }
 
-	stop() {
-		log_daemon_msg "Stopping $DESC" $NAME
-		if start-stop-daemon --stop --retry 30 --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
-		then
-		    rm -f $FOSWIKI_PIDFILE
-		    log_end_msg 0
-		else
-		    log_end_msg 1
-		fi
-	}
+        status() {
+                status_of_proc -p "$FOSWIKI_PIDFILE" "$FOSWIKI_DAEMON" $NAME
+        }
 
-	reload() {
-		log_daemon_msg "Reloading $DESC" $NAME
-		if start-stop-daemon --stop --signal HUP --oknodo --quiet --pidfile $FOSWIKI_PIDFILE
-		then
-		    log_end_msg 0
-		else
-		    log_end_msg 1
-		fi
-	}
+        . /lib/lsb/init-functions
 
-	status() {
-		status_of_proc -p "$FOSWIKI_PIDFILE" "$FOSWIKI_DAEMON" $NAME
-	}
-
-	. /lib/lsb/init-functions
-
-	case "$1" in
-	  start)
-	    start
-	    ;;
-	  stop)
-	    stop
-	    ;;
-	  reload)
-	    reload
-	    ;;
-	  restart)
-	    stop
-	    start
-	    ;;
-	  status)
-	    status
-	    ;;
-	  *)
-	    echo "Usage: $NAME {start|stop|restart|reload|status}"
-	    exit 1
-	    ;;
-	esac
+        case "$1" in
+          start)
+            start
+            ;;
+          stop)
+            stop
+            ;;
+          reload)
+            reload
+            ;;
+          restart)
+            stop
+            start
+            ;;
+          status)
+            status
+            ;;
+          *)
+            echo "Usage: $NAME {start|stop|restart|reload|status}"
+            exit 1
+            ;;
+        esac
 EOF
-	# end file /etc/init.d/fw-prod 
+        # end file /etc/init.d/fw-prod 
 
-	chown root:root /etc/init.d/fw-prod
-	chmod 755 /etc/init.d/fw-prod
+        chown root:root /etc/init.d/fw-prod
+        chmod 755 /etc/init.d/fw-prod
 else
-	apt-get install -y apache2 libapache2-mod-fcgid
-	a2enmod rewrite cgid
-	service apache stop
-	rm /etc/apache2/sites-available/000-default.conf
-	rm /etc/apache2/sites-available/default-ssl.conf
-	# start file 000-default.conf
-	cat <<"EOF" > /etc/apache2/sites-available/fw-prod.conf
+        # Apache + fastcgi
+        cat <<"EOF" >> /etc/apt/sources.list
+deb http://archive.ubuntu.com/ubuntu trusty multiverse
+deb http://archive.ubuntu.com/ubuntu trusty-updates multiverse
+deb http://security.ubuntu.com/ubuntu trusty-security multiverse
+EOF
+        aptitude update
+        aptitude -y install apache2 libapache2-mod-fastcgi
+        a2enmod rewrite
+        service apache stop
+        rm /etc/apache2/sites-available/000-default.conf
+        rm /etc/apache2/sites-available/default-ssl.conf
+        # start file 000-default.conf
+        cat <<"EOF" > /etc/apache2/sites-available/fw-prod.conf
 # Autogenerated httpd.conf file for Foswiki.
-# Generated at http://foswiki.org/Support/ApacheConfigGenerator?vhost=;port=;dir=/var/www/fw-prod/core;symlink=on;pathurl=/;shorterurls=enabled;engine=FastCGI;fastcgimodule=fcgid;fcgidreqlen=;apver=2;confighost=;configip=;configuser=;loginmanager=Template;htpath=;errordocument=UserRegistration;errorcustom=;phpinstalled=None;blockpubhtml=;blocktrashpub=;controlattach=;blockspiders=;foswikiversion=1.2;apacheversion=2.4;timeout=;ssl=;sslcert=/etc/ssl/apache2/yourservercert.pem;sslchain=/etc/ssl/apache2/sub.class1.server.ca.pem;sslkey=/etc/ssl/apache2/yourservercertkey.pem
+# Generated at http://foswiki.org/Support/ApacheConfigGenerator?vhost=;port=;dir=/var/www/fw-prod/core;symlink=on;pathurl=/;shorterurls=enabled;engine=FastCGI;fastcgimodule=fastcgi;fcgidreqlen=;apver=2;confighost=;configip=;configuser=;loginmanager=Template;htpath=;errordocument=UserRegistration;errorcustom=;phpinstalled=None;blockpubhtml=;blocktrashpub=;controlattach=;blockspiders=;foswikiversion=1.2;apacheversion=2.4;timeout=;ssl=;sslcert=/etc/ssl/apache2/yourservercert.pem;sslchain=/etc/ssl/apache2/sub.class1.server.ca.pem;sslkey=/etc/ssl/apache2/yourservercertkey.pem
 
 # For Foswiki version 1.2,  Apache 2.4
 
@@ -279,10 +284,18 @@ RewriteRule ^/+bin/+view$ / [L,NE,R]
     </RequireAll>
 </Directory>
 
-<IfModule mod_fcgid.c>
-    DefaultMaxClassProcessCount 3
+<IfModule mod_fastcgi.c>
+    # Commenting the next setting makes foswiki to be a dynamic server, loaded on demand.
+    # Adjust the number of servers to your needs
+    FastCgiServer "/var/www/fw-prod/core/bin/foswiki.fcgi" -processes 3
 
-    # Refer to details at http://fastcgi.coremail.cn/doc.htm
+    # Running an external server on the same machine:
+    #FastCgiExternalServer "/var/www/fw-prod/core/bin/foswiki.fcgi" -socket /path/to/foswiki.sock
+
+    # Or at another machine:
+    #FastCgiExternalServer "/var/www/fw-prod/core/bin/foswiki.fcgi" -host example.com:8080
+
+    # Refer to details at http://www.fastcgi.com/mod_fastcgi/docs/mod_fastcgi.html
 </IfModule>
 
 # This specifies the options on the Foswiki scripts directory. The ExecCGI
@@ -301,7 +314,7 @@ RewriteRule ^/+bin/+view$ / [L,NE,R]
     Options +ExecCGI  +FollowSymLinks
     SetHandler cgi-script
     <Files "foswiki.fcgi">
-        SetHandler fcgid-script
+        SetHandler fastcgi-script
     </Files>
 
     # Password file for Foswiki users
@@ -313,7 +326,6 @@ RewriteRule ^/+bin/+view$ / [L,NE,R]
     ErrorDocument 401 /System/UserRegistration
 
 </Directory>
-
 # This sets the options on the pub directory, which contains attachments and
 # other files like CSS stylesheets and icons. AllowOverride None stops a
 # user installing a .htaccess file that overrides these options.
@@ -415,14 +427,12 @@ RewriteRule ^/+bin/+view$ / [L,NE,R]
 
 BrowserMatchNoCase ^$ blockAccess
 
-
 EOF
-	# end file fw-prod.conf
+        # end file fw-prod.conf
 
-	# Enable site and restart server
-	a2dissite 000-default.conf
-	a2ensite fw-prod
-	service apache2 restart
+        # Enable site and restart server
+        a2dissite 000-default.conf
+        a2ensite fw-prod
 fi
 
 # -----------------------------------------------------------------------------
@@ -435,7 +445,7 @@ cat <<EOF > /etc/sudoers.d/www-data
 www-data ALL=(ALL:ALL) NOPASSWD: ALL
 EOF
 
-# Create usual .config files for www-data, plus set up some useful env variables
+# Create usual .config files for www-data, plus set up some useful env variables, also for root
 # (www-data is already set with /var/www as it's home directory)
 
 cp -rvt /var/www `find /etc/skel -name '.*'`
@@ -445,6 +455,16 @@ fw_http='/etc/nginx/sites-available/fw-prod.conf'
 fw_init='/etc/init.d/fw-prod'
 fw_httplog='/var/log/nginx/fw-prod.log'
 export fw_http fw_init fw_httplog
+EOF
+
+cat <<EOF >> /home/vagrant/.bashrc
+# Create some useful fw_* ENVironment variables
+alias l='ls -la'
+alias c='clear'
+EOF
+
+cat <<EOF > /home/vagrant/.inputrc
+set editing-mode vi
 EOF
 
 chown -R www-data:www-data /var/www/
@@ -462,8 +482,6 @@ chown -R www-data:www-data fw-prod
 cd /var/www/fw-prod/core
 sudo -u www-data perl -T pseudo-install.pl developer
 sudo -u www-data perl -T pseudo-install.pl FastCGIEngineContrib
-# MM
-# sudo -u www-data perl -T pseudo-install.pl NatSkin NatSkinPlugin Solr ClassificationPlugin 
 
 # Bootstrap configure
   # -set {DefaultUrlHost}="http://localhost:$www_port" \
@@ -488,13 +506,27 @@ sudo -u www-data perl tools/configure \
   -save
 
 # -----------------------------------------------------------------------------
-# enable and start fcgi
+# enable and start fcgi for nginx / start apache after FastCGIEngineContrib install
 
-update-rc.d fw-prod defaults
-
-if [ "$web_serv" == "nginx" ]
-then service fw-prod start
+if [ "$web_serv" == "nginx" ]; then
+        service fw-prod start
+        update-rc.d fw-prod defaults
+else
+        service apache2 restart
 fi
 
-# Hopefully http://localhost:$www_port will now bring up the foswiki Main/WebHome topic
+# -----------------------------------------------------------------------------
+# add some extra stuff for demonstration purpose
 
+if [ $extraStf -eq 0 ]
+then exit 0
+echo "No extra stuff asked, end of VM configuration, enjoy Foswiki at http://localhost:$www_port"; exit 0;
+fi
+
+cd /var/www/fw-prod/core
+# sudo -u www-data perl -T pseudo-install.pl NatSkin NatSkinPlugin Solr ClassificationPlugin 
+sudo -u www-data perl -T pseudo-install.pl CopyContrib
+
+echo "Some extra stuff installed as requested (...). End of VM configuration, enjoy Foswiki at http://localhost:$www_port"; exit 0;
+
+# Hopefully http://localhost:$www_port will now bring up the foswiki Main/WebHome topic
