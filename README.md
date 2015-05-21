@@ -9,7 +9,7 @@ Folder name is now : Hostname__webport_sshport_webserv, with following default v
 
 For instance :
    * git clone https://github.com/Jlevens/FoswikiVagrant
-   * mv FoswikiVagrantNginx testfw__8081_2221_nginx
+   * cp -r FoswikiVagrantNginx testfw__8081_2221_nginx
    * cd testfw__8081_2221_nginx
    * vagrant up
 
